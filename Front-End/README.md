@@ -1,1 +1,1 @@
-Front-End Blog
+Front-End Completo do projeto
