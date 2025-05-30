@@ -1,13 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-
-import { Edit, Ban } from "lucide-react";
-import Link from "next/link";
+import { Edit2, Trash2 } from "lucide-react";
+import UserListLoading from "../loadings/UserListLoading";
+import QueryError from "../errors/QueryError";
+import { useToast } from "../ui/use-toast";
+import { IUser } from "@/app/api/_services/modules/user/entities/user";
+import { Column, DataTable } from "../shared/DataTable";
+import { Button } from "../ui/button";
+import { UserDialog } from "./dialogs/UserDialog";
+import { Badge } from "../ui/badge";
 import {
    AlertDialog,
    AlertDialogAction,
@@ -19,58 +24,82 @@ import {
    AlertDialogTitle,
    AlertDialogTrigger,
 } from "../ui/alert-dialog";
-import { Button } from "../ui/button";
-import { IUser } from "@/app/api/_services/modules/user/entities/user";
-import { Column, DataTable } from "../shared/DataTable";
-import { useToast } from "../ui/use-toast";
-import { UserDialog } from "./dialogs/UserDialog";
-
-const PAGE_SIZE = 10;
+import { ITENS_PER_PAGE_TABLE } from "@/utils/constantes/constants";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export function UserList() {
-   const [page, setPage] = useState(1);
+   const router = useRouter();
+   const searchParams = useSearchParams();
    const { toast } = useToast();
-   const [selectedUser, setSelectedUser] = useState<IUser | null>(null);
+   const queryClient = useQueryClient();
 
-   const { data, isLoading, refetch } = useQuery({
-      queryKey: ["users", page],
+   const [currentPage, setCurrentPage] = useState(1);
+
+   const { data, isLoading, error, refetch } = useQuery({
+      queryKey: ["users", currentPage],
       queryFn: async () => {
-         const response = await fetch(
-            `/api/users?page=${page}&limit=${PAGE_SIZE}`
-         );
+         const params = new URLSearchParams({
+            page: currentPage.toString(),
+            limit: ITENS_PER_PAGE_TABLE.toString(),
+         });
+
+         const response = await fetch(`/api/users/page?${params}`);
+
          if (!response.ok) {
             throw new Error("Erro ao buscar usuários");
          }
+
          return response.json();
       },
    });
 
-   const handleBanUser = async (user: IUser) => {
-      try {
-         const response = await fetch(`/api/users?id=${user.id}`, {
+   const { mutate: deleteUser } = useMutation({
+      mutationFn: async (id: string) => {
+         const response = await fetch(`/api/users?id=${id}`, {
             method: "DELETE",
          });
 
          if (!response.ok) {
-            throw new Error("Erro ao banir usuário");
+            const error = await response.json();
+            throw new Error(error.message || "Erro Desconhecido");
          }
-
+         return response.json();
+      },
+      onSuccess: () => {
          toast({
-            title: "Usuário banido",
-            description: `O usuário ${user.name} foi banido com sucesso.`,
+            title: "Usuário excluído com sucesso!",
+            description: "O usuário foi removido do sistema.",
          });
-
-         refetch();
-      } catch (error) {
+         queryClient.invalidateQueries({ queryKey: ["users"] });
+      },
+      onError: (error) => {
          toast({
-            title: "Erro ao banir usuário",
-            description: "Ocorreu um erro ao tentar banir o usuário.",
+            title: "Erro ao excluir usuário",
+            description:
+               "Ocorreu um erro ao tentar excluir o usuário: " + error.message,
             variant: "destructive",
          });
-      }
+      },
+   });
+
+   const handleDelete = async (id: string) => {
+      deleteUser(id);
+      refetch();
    };
 
+   const handlePageChange = (newPage: number) => {
+      setCurrentPage(newPage);
+   };
+
+   if (isLoading) return <UserListLoading />;
+
+   if (error) return <QueryError onRetry={() => refetch()} />;
+
    const columns: Column<IUser>[] = [
+      {
+         header: "ID",
+         accessorKey: (user: IUser) => user.id,
+      },
       {
          header: "Nome",
          accessorKey: (user: IUser) => user.name,
@@ -81,14 +110,7 @@ export function UserList() {
       },
       {
          header: "Função",
-         accessorKey: (user: IUser) => user.role?.name || "Usuário",
-      },
-      {
-         header: "Membro desde",
-         accessorKey: (user: IUser) =>
-            format(new Date(user.createdAt), "dd 'de' MMMM 'de' yyyy", {
-               locale: ptBR,
-            }),
+         accessorKey: (user: IUser) => user.role?.name || "Sem função",
       },
       {
          header: "Posts",
@@ -96,41 +118,44 @@ export function UserList() {
          className: "text-right",
       },
       {
+         header: "Data",
+         accessorKey: (user: IUser) =>
+            format(new Date(user.createdAt), "dd 'de' MMMM 'de' yyyy", {
+               locale: ptBR,
+            }),
+      },
+      {
          header: "Ações",
          accessorKey: (user: IUser) => (
-            <div className="flex items-center gap-2 justify-end">
-               <UserDialog user={user} mode="edit">
-                  <Button size="sm" variant="ghost">
-                     <Edit className="h-4 w-4" />
+            <div className="flex items-center gap-2">
+               <UserDialog user={user}>
+                  <Button variant="ghost" size="icon">
+                     <Edit2 className="h-4 w-4" />
                   </Button>
                </UserDialog>
-
                <AlertDialog>
                   <AlertDialogTrigger asChild>
-                     <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => setSelectedUser(user)}
-                     >
-                        <Ban className="h-4 w-4" />
+                     <Button variant="ghost" size="icon">
+                        <Trash2 className="h-4 w-4 text-destructive" />
                      </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                      <AlertDialogHeader>
-                        <AlertDialogTitle>Banir Usuário</AlertDialogTitle>
+                        <AlertDialogTitle>
+                           Tem certeza que deseja excluir este usuário?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                           Tem certeza que deseja banir o usuário {user.name}?
-                           Esta ação não pode ser desfeita.
+                           Esta ação não pode ser desfeita. Isso excluirá
+                           permanentemente o usuário e removerá os dados do
+                           servidor.
                         </AlertDialogDescription>
                      </AlertDialogHeader>
                      <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
                         <AlertDialogAction
-                           onClick={() => handleBanUser(user)}
-                           className="bg-destructive hover:bg-destructive/90"
+                           onClick={() => handleDelete(user.id)}
                         >
-                           Banir
+                           Continuar
                         </AlertDialogAction>
                      </AlertDialogFooter>
                   </AlertDialogContent>
@@ -140,20 +165,16 @@ export function UserList() {
       },
    ];
 
-   if (isLoading) {
-      return <div>Carregando...</div>;
-   }
-
    return (
       <DataTable<IUser>
          data={data?.users || []}
          columns={columns}
          pagination={{
-            page,
-            pageSize: PAGE_SIZE,
+            page: currentPage,
+            pageSize: ITENS_PER_PAGE_TABLE,
             total: data?.total || 0,
          }}
-         onPageChange={setPage}
+         onPageChange={handlePageChange}
       />
    );
 }

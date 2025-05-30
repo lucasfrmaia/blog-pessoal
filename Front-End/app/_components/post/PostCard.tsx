@@ -1,9 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Clock, MessageSquare, Eye, CalendarDays } from "lucide-react";
 
-import { Clock, MessageSquare, Eye } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Card, CardContent, CardHeader } from "../ui/card";
+import { ICategory } from "@/app/api/_services/modules/category/entities/category";
+import { CategoryBadge } from "../category/CategoryBadge";
 
 interface PostCardProps {
    id: string;
@@ -11,9 +13,10 @@ interface PostCardProps {
    excerpt: string;
    coverImage: string;
    readTime: string;
-   category: string;
+   categories?: ICategory[];
    views?: number;
    commentsCount?: number;
+   publishedAt: string | Date; // <- Adicionado
 }
 
 export default function PostCard({
@@ -22,10 +25,19 @@ export default function PostCard({
    excerpt,
    coverImage,
    readTime,
-   category,
+   categories = [],
    views = 0,
    commentsCount = 0,
+   publishedAt,
 }: PostCardProps) {
+   const formattedDate = new Date(publishedAt).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+   });
+
    return (
       <Link href={`/posts/${id}`}>
          <Card className="overflow-hidden h-full hover:shadow-lg transition-shadow group">
@@ -35,24 +47,28 @@ export default function PostCard({
                   alt={title}
                   className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
                />
-               <Badge
-                  variant="secondary"
-                  className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm"
-               >
-                  {category}
-               </Badge>
+               {categories.slice(0, 2).map((category) => (
+                  <CategoryBadge
+                     key={category.id}
+                     className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm"
+                     category={category}
+                  />
+               ))}
             </div>
             <CardHeader className="border-b bg-card">
-               <h3 className="text-xl font-semibold line-clamp-2 group-hover:text-primary transition-colors">
+               <h3 className="text-xl font-semibold line-clamp-2 min-h-[3.5rem] group-hover:text-primary transition-colors">
                   {title}
                </h3>
             </CardHeader>
-            <CardContent className="pt-4">
-               <p className="text-muted-foreground line-clamp-2 mb-4">
-                  {excerpt}
-               </p>
+            <CardContent className="pt-4 h-[10rem] flex flex-col justify-between">
+               <p className="text-muted-foreground line-clamp-2">{excerpt}</p>
+
                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <div className="flex items-center space-x-4">
+                  <div className="flex flex-col mr-1">
+                     <div className="flex items-center text-sm text-muted-foreground">
+                        <CalendarDays className="mr-1 h-4 w-4" />
+                        <span>{formattedDate}</span>
+                     </div>
                      <span className="flex items-center">
                         <Clock className="mr-1 h-4 w-4" />
                         {readTime}
@@ -62,6 +78,7 @@ export default function PostCard({
                         {views}
                      </span>
                   </div>
+
                   <span className="flex items-center">
                      <MessageSquare className="mr-1 h-4 w-4" />
                      {commentsCount}

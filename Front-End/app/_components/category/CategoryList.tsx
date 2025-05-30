@@ -1,12 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Ban, Edit2, Trash2 } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Edit2, Trash2 } from "lucide-react";
 import CategoryListLoading from "../loadings/CategoryListLoading";
-import { Button } from "../ui/button";
+import QueryError from "../errors/QueryError";
+import { useToast } from "../ui/use-toast";
 import { ICategory } from "@/app/api/_services/modules/category/entities/category";
 import { Column, DataTable } from "../shared/DataTable";
+import { Button } from "../ui/button";
 import { CategoryDialog } from "./dialogs/CategoryDialog";
+import { Badge } from "../ui/badge";
 import {
    AlertDialog,
    AlertDialogAction,
@@ -18,34 +24,85 @@ import {
    AlertDialogTitle,
    AlertDialogTrigger,
 } from "../ui/alert-dialog";
-
-const PAGE_SIZE = 10;
+import { ITENS_PER_PAGE_TABLE } from "@/utils/constantes/constants";
+import { useRouter, useSearchParams } from "next/navigation";
+import { CategoryBadge } from "./CategoryBadge";
 
 export default function CategoryList() {
-   const {
-      data: categories,
-      isLoading,
-      refetch,
-   } = useQuery<ICategory[]>({
-      queryKey: ["categories"],
+   const router = useRouter();
+   const searchParams = useSearchParams();
+   const { toast } = useToast();
+   const queryClient = useQueryClient();
+
+   const [currentPage, setCurrentPage] = useState(1);
+
+   const { data, isLoading, error, refetch } = useQuery({
+      queryKey: ["categories", currentPage],
       queryFn: async () => {
-         const response = await fetch("/api/categories");
+         const params = new URLSearchParams({
+            page: currentPage.toString(),
+            limit: ITENS_PER_PAGE_TABLE.toString(),
+         });
+
+         const response = await fetch(`/api/categories/page?${params}`);
+
          if (!response.ok) {
-            throw new Error("Erro ao buscar categorias");
+            const error = await response.json();
+            throw new Error(error?.message || "Erro Desconhecido");
          }
+
          return response.json();
       },
    });
 
-   const handleDeleteCategory = async (id: string) => {
-      await fetch(`/api/categories/${id}`, {
-         method: "DELETE",
-      });
+   const { mutate: deleteCategory } = useMutation({
+      mutationFn: async (id: string) => {
+         const response = await fetch(`/api/categories/${id}`, {
+            method: "DELETE",
+         });
 
+         if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error?.message || "Erro Desconhecido");
+         }
+         return response.json();
+      },
+      onSuccess: () => {
+         toast({
+            title: "Categoria excluída com sucesso!",
+            description: "A categoria foi removida do sistema.",
+         });
+         queryClient.invalidateQueries({ queryKey: ["categories"] });
+      },
+      onError: (error) => {
+         toast({
+            title: "Erro ao excluir categoria",
+            description:
+               "Ocorreu um erro ao tentar excluir a categoria: " +
+               error.message,
+            variant: "destructive",
+         });
+      },
+   });
+
+   const handleDelete = async (id: string) => {
+      deleteCategory(id);
       refetch();
    };
 
+   const handlePageChange = (newPage: number) => {
+      setCurrentPage(newPage);
+   };
+
+   if (isLoading) return <CategoryListLoading />;
+
+   if (error) return <QueryError onRetry={() => refetch()} />;
+
    const columns: Column<ICategory>[] = [
+      {
+         header: "ID",
+         accessorKey: (category: ICategory) => category.id,
+      },
       {
          header: "Nome",
          accessorKey: (category: ICategory) => category.name,
@@ -53,13 +110,7 @@ export default function CategoryList() {
       {
          header: "Cor",
          accessorKey: (category: ICategory) => (
-            <div className="flex items-center gap-2">
-               <div
-                  className="w-4 h-4 rounded-full"
-                  style={{ backgroundColor: category.color }}
-               />
-               {category.color}
-            </div>
+            <CategoryBadge category={category} />
          ),
       },
       {
@@ -68,46 +119,47 @@ export default function CategoryList() {
          className: "text-right",
       },
       {
-         header: "Descrição",
-         accessorKey: (category) => category.description,
-         className: "text-center",
+         header: "Data",
+         accessorKey: (category: ICategory) => {
+            return <div>{new Date(category.createdAt).toDateString()}</div>;
+         },
       },
       {
          header: "Ações",
          accessorKey: (category: ICategory) => (
             <div className="flex items-center gap-2">
-               <CategoryDialog category={category} mode="edit">
+               <CategoryDialog
+                  currentPage={currentPage}
+                  mode="edit"
+                  category={category}
+               >
                   <Button variant="ghost" size="icon">
                      <Edit2 className="h-4 w-4" />
-                     <span className="sr-only">Editar categoria</span>
                   </Button>
                </CategoryDialog>
-
                <AlertDialog>
                   <AlertDialogTrigger asChild>
-                     <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-destructive hover:text-destructive"
-                     >
-                        <Trash2 className="h-4 w-4" />
+                     <Button variant="ghost" size="icon">
+                        <Trash2 className="h-4 w-4 text-destructive" />
                      </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                      <AlertDialogHeader>
-                        <AlertDialogTitle>Excluir Categoria</AlertDialogTitle>
+                        <AlertDialogTitle>
+                           Tem certeza que deseja excluir esta categoria?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                           Tem certeza que deseja Excluir a categoria{" "}
-                           {category.name}? Esta ação não pode ser desfeita.
+                           Esta ação não pode ser desfeita. Isso excluirá
+                           permanentemente a categoria e removerá os dados do
+                           servidor.
                         </AlertDialogDescription>
                      </AlertDialogHeader>
                      <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
                         <AlertDialogAction
-                           onClick={() => handleDeleteCategory(category.id)}
-                           className="bg-destructive hover:bg-destructive/90"
+                           onClick={() => handleDelete(category.id)}
                         >
-                           Excluir
+                           Continuar
                         </AlertDialogAction>
                      </AlertDialogFooter>
                   </AlertDialogContent>
@@ -117,18 +169,16 @@ export default function CategoryList() {
       },
    ];
 
-   if (isLoading) return <CategoryListLoading />;
-
    return (
       <DataTable<ICategory>
-         data={categories || []}
+         data={data?.categories || []}
          columns={columns}
          pagination={{
-            page: 1,
-            pageSize: PAGE_SIZE,
-            total: categories?.length || 0,
+            page: currentPage,
+            pageSize: ITENS_PER_PAGE_TABLE,
+            total: data?.total || 0,
          }}
-         onPageChange={() => {}}
+         onPageChange={handlePageChange}
       />
    );
 }

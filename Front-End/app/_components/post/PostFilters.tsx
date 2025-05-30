@@ -1,3 +1,5 @@
+"use client";
+
 import { Search, SlidersHorizontal, X, Filter, RotateCcw } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Badge } from "../ui/badge";
@@ -11,12 +13,12 @@ import {
 } from "../ui/select";
 import { ICategory } from "@/app/api/_services/modules/category/entities/category";
 import { Button } from "../ui/button";
+import { useQuery } from "@tanstack/react-query";
 
 interface PostFiltersProps {
    initialSearch: string;
    initialCategories: string[];
    initialSortBy: string;
-   categories?: ICategory[];
    onApplyFilters: (filters: {
       search: string;
       categories: string[];
@@ -29,7 +31,6 @@ export default function PostFilters({
    initialSearch,
    initialCategories,
    initialSortBy,
-   categories = [],
    onApplyFilters,
    onResetFilters,
 }: PostFiltersProps) {
@@ -37,6 +38,17 @@ export default function PostFilters({
    const [selectedCategories, setSelectedCategories] =
       useState<string[]>(initialCategories);
    const [sortBy, setSortBy] = useState(initialSortBy);
+
+   const { data: categories, isLoading } = useQuery<ICategory[]>({
+      queryKey: ["categories"],
+      queryFn: async () => {
+         const response = await fetch("/api/categories");
+         if (!response.ok) {
+            throw new Error("Erro ao buscar categorias");
+         }
+         return response.json();
+      },
+   });
 
    useEffect(() => {
       setSearchValue(initialSearch);
@@ -79,13 +91,14 @@ export default function PostFilters({
          <div className="flex flex-wrap gap-4">
             <div className="flex-1">
                <Input
+                  disabled={isLoading}
                   placeholder="Pesquisar posts..."
                   value={searchValue}
                   onChange={(e) => setSearchValue(e.target.value)}
                />
             </div>
             <Select value={sortBy} onValueChange={setSortBy}>
-               <SelectTrigger className="w-[180px]">
+               <SelectTrigger disabled={isLoading} className="w-[180px]">
                   <SelectValue placeholder="Ordenar por" />
                </SelectTrigger>
                <SelectContent>
@@ -97,7 +110,7 @@ export default function PostFilters({
          </div>
 
          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
+            {categories?.map((category) => (
                <Button
                   key={category.id}
                   variant={
@@ -116,7 +129,7 @@ export default function PostFilters({
          {selectedCategories.length > 0 && (
             <div className="flex flex-wrap gap-2">
                {selectedCategories.map((categoryId) => {
-                  const category = categories.find((c) => c.id === categoryId);
+                  const category = categories?.find((c) => c.id === categoryId);
                   if (!category) return null;
                   return (
                      <Badge

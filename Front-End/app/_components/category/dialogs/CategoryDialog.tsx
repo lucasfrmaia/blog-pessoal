@@ -25,6 +25,7 @@ import { Input } from "@/app/_components/ui/input";
 import { Textarea } from "@/app/_components/ui/textarea";
 import { useToast } from "@/app/_components/ui/use-toast";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 const formSchema = z.object({
    name: z.string().min(1, "O nome é obrigatório"),
@@ -36,16 +37,18 @@ interface CategoryDialogProps {
    mode: "create" | "edit";
    category?: ICategory;
    children?: React.ReactNode;
+   currentPage?: number;
 }
 
 export function CategoryDialog({
    mode,
    category,
    children,
+   currentPage,
 }: CategoryDialogProps) {
    const [open, setOpen] = useState(false);
    const { toast } = useToast();
-   const router = useRouter();
+   const queryClient = useQueryClient();
 
    const form = useForm({
       resolver: zodResolver(formSchema),
@@ -73,13 +76,12 @@ export function CategoryDialog({
 
          if (!response.ok) {
             const errorData = await response.json();
-
-            throw new Error(
-               "Erro ao salvar categoria: " +
-                  errorData.message +
-                  errorData.error
-            );
+            throw new Error(errorData.message + errorData.error);
          }
+
+         queryClient.invalidateQueries({
+            queryKey: ["categories"],
+         });
 
          toast({
             title:
@@ -90,7 +92,6 @@ export function CategoryDialog({
          });
 
          setOpen(false);
-         router.refresh();
       } catch (error) {
          toast({
             title: "Erro",
