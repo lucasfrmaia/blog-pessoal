@@ -49,3 +49,11 @@ npm run dev
 
 ---
 
+## Usuários
+
+* Ususário admin 
+    Email: lucas@gmail.com.br
+    Senha: C123456789
+
+---
+

@@ -14,9 +14,10 @@ export async function POST(request: Request) {
       }
 
       const existingUser = await apiManager.user.findByEmail(email);
-      if (existingUser) {
+
+      if (existingUser != null) {
          return NextResponse.json(
-            { error: "Email já cadastrado" },
+            { message: "Email já cadastrado" },
             { status: 400 }
          );
       }
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
          name,
          email,
          password,
-         roleId: 2,
+         roleId: Number(process.env.USER_ROLE) || 2,
       });
 
       return NextResponse.json(

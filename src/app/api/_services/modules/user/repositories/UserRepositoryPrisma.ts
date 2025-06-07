@@ -86,7 +86,7 @@ export class UserRepositoryPrisma implements IUserRepository {
    }
 
    async findByEmail(email: string): Promise<IUser | null> {
-      const user = await prisma.user.findUnique({
+      const user = await prisma.user.findFirst({
          where: { email },
          include: { role: true, posts: true, comments: true },
       });
