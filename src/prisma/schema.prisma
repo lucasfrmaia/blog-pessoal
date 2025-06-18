@@ -26,6 +26,7 @@ model User {
   email     String   @unique
   password  String
   salt      String
+  avatar    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   roleId    Int
@@ -34,6 +35,19 @@ model User {
   
   posts     Post[]
   comments  Comment[]
+  likesComment LikeComment[]
+  favoritPosts FavoritePost[]
+}
+
+model FavoritePost {
+  userId String
+  postId String
+
+  post  Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user  User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, postId])
+
 }
 
 model Category {
@@ -41,7 +55,7 @@ model Category {
   name        String @unique
   color       String
   createdAt   DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
+  updatedAt   DateTime @default(now()) @updatedAt
   description String @default("")
 
   posts Post[]
@@ -57,10 +71,13 @@ model Post {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   authorId    String
+  status      String @default("Ativo")
   author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   categories    Category[] 
   comments    Comment[]
+
+  FavoritePost FavoritePost[]
 }
 
 model Comment {
@@ -69,14 +86,26 @@ model Comment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  parent_id String? // Torna o campo opcional
+  parentId String? // Torna o campo opcional
   userId            String
   postId            String
-
-  parent   Comment?  @relation("CommentToReplies", fields: [parent_id], references: [id], onDelete: Cascade)
-
+  edited            Boolean @default(false)
+  likesCount        Int @default(0) 
+  deslikesCount     Int @default(0) 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   post     Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parent   Comment?  @relation("CommentToReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies  Comment[] @relation("CommentToReplies")
+
+  likes LikeComment[]
 }
 
+model LikeComment {
+   commentId String
+   userId    String
+   type      String
+   comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+   @@id([commentId, userId])
+}
