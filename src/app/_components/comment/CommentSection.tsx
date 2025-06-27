@@ -1,12 +1,13 @@
-import { useSession } from "next-auth/react";
-import { useQuery } from "@tanstack/react-query";
+import { useSession } from 'next-auth/react';
+import { useQuery } from '@tanstack/react-query';
 
-import CommentSectionLoading from "../loadings/CommentSectionLoading";
-import QueryError from "../errors/QueryError";
-import { CommentForm } from "./CommentForm";
-import { CommentList } from "./CommentList";
-import { Card, CardContent } from "../ui/card";
-import { IComment } from "@/app/api/_services/modules/comment/entities/comment";
+import CommentSectionLoading from '../loadings/CommentSectionLoading';
+import QueryError from '../errors/QueryError';
+import { CommentForm } from './CommentForm';
+import { CommentList } from './CommentList';
+import { Card, CardContent } from '../ui/card';
+import { IComment } from '@/app/api/_services/entities/comment';
+import { useEffect } from 'react';
 
 interface CommentSectionProps {
    postId: string;
@@ -21,11 +22,13 @@ export default function CommentSection({ postId }: CommentSectionProps) {
       error,
       refetch,
    } = useQuery<IComment[]>({
-      queryKey: ["comments", postId],
+      queryKey: ['comments', postId],
       queryFn: async () => {
-         const response = await fetch(`/api/comments/post/${postId}`);
+         const response = await fetch(
+            `${process.env.API_URL}/comments/post/${postId}`,
+         );
          if (!response.ok) {
-            throw new Error("Erro ao buscar comentários");
+            throw new Error('Erro ao buscar comentários');
          }
          return response.json();
       },

@@ -8,7 +8,7 @@ export async function POST(request: Request) {
 
       if (!name || !email || !password) {
          return NextResponse.json(
-            { error: 'Dados inválidos' },
+            { message: 'Dados inválidos' },
             { status: 400 },
          );
       }
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
       if (existingUser != null) {
          return NextResponse.json(
-            { error: 'Email já cadastrado' },
+            { message: 'Email já cadastrado' },
             { status: 400 },
          );
       }
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
    } catch (error) {
       console.error('Erro ao criar usuário:', error);
       return NextResponse.json(
-         { error: 'Erro ao criar usuário' },
+         { message: 'Erro ao criar usuário' },
          { status: 500 },
       );
    }
